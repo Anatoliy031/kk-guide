@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <title>Куда поехать — Краснодарский край | Достопримечательности и организаторы</title>
+  <meta name="description" content="Полный каталог достопримечательностей Краснодарского края и контакты организаторов туристических маршрутов. Карта, фильтры, поиск, что рядом." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Ccircle cx='64' cy='64' r='64' fill='%230033A0'/%3E%3Cpath fill='%23fff' d='M34 80c16-10 44-10 60 0l-6 10c-13-8-35-8-48 0zM54 40a10 10 0 1 0 20 0a10 10 0 1 0-20 0z'/%3E%3C/svg%3E" />
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script> tailwind.config={ theme:{ extend:{ colors:{ rs:'#0033A0', accent:'#00B4F0', ink:'#0B1A2B', soft:'#F5F7FB'} } } } </script>
+  <!-- Leaflet + MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <!-- Fuse.js (поиск) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.6.2/fuse.min.js"></script>
+
+  <style>
+    :root{ --rs:#0033A0; --accent:#00B4F0; --ink:#0B1A2B; --soft:#F5F7FB; }
+    html,body{height:100%;}
+    .glass{backdrop-filter:saturate(140%) blur(8px); background:rgba(255,255,255,.75); }
+    .tag{display:inline-block;padding:.25rem .5rem;border-radius:9999px;border:1px solid #E5EEF8;background:#fff;font-size:.75rem}
+    .btn{display:inline-flex;align-items:center;gap:.5rem;border-radius:.75rem;padding:.6rem .9rem;font-weight:600}
+    .btn-primary{background:var(--rs);color:#fff}
+    .btn-outline{border:1px solid #dbe5f2;background:#fff}
+    .badge{font-size:.7rem;background:#E8F3FF;color:#0b3b8a;border:1px solid #CFE6FF;border-radius:.5rem;padding:.2rem .5rem}
+    #map{height:60vh; min-height:420px; border-radius:1rem; border:1px solid #e8edf5}
+    .card{border:1px solid #e8edf5;border-radius:1rem;background:#fff}
+    .sticky-header{position:sticky;top:0;z-index:40}
+    .fav{cursor:pointer}
+    .shadow-soft{box-shadow:0 10px 30px rgba(0,0,0,.06)}
+    .geomsg{font-size:.85rem;color:#38556e}
+  </style>
+</head>
+<body class="bg-soft text-[15px] text-ink">
+<header class="sticky-header glass border-b border-slate-200">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-full bg-rs flex items-center justify-center text-white font-black">КК</div>
+    <div class="flex-1">
+      <h1 class="text-xl font-extrabold text-rs leading-tight">Куда поехать — Краснодарский край</h1>
+      <p class="text-slate-600">Достопримечательности, маршруты и контакты организаторов</p>
+    </div>
+    <button id="installBtn" class="btn btn-outline hidden" title="Установить как приложение">📲 Установить</button>
+    <a class="btn btn-outline" href="#" id="exportCsv">⬇️ Экспорт CSV</a>
+    <a class="btn btn-primary" href="#add">➕ Добавить объект</a>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 space-y-6 py-6">
+  <!-- Панель -->
+  <section class="card p-4 shadow-soft">
+    <div class="grid md:grid-cols-4 gap-3">
+      <div class="md:col-span-2">
+        <label class="text-xs text-slate-500">Поиск</label>
+        <input id="q" class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent" placeholder="Например: ‘Сафари-парк’, ‘джипинг’, ‘Абрау’...">
+      </div>
+      <div>
+        <label class="text-xs text-slate-500">Категория</label>
+        <select id="cat" class="w-full border rounded-lg px-3 py-2">
+          <option value="">Все</option>
+          <option>Природа</option>
+          <option>Парки/аттракционы</option>
+          <option>История/музеи</option>
+          <option>Горнолыжный кластер</option>
+          <option>Винные туры</option>
+          <option>Организатор/туроператор</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-slate-500">Район/город</label>
+        <select id="dist" class="w-full border rounded-lg px-3 py-2">
+          <option value="">Любой</option>
+          <option>Краснодар</option><option>Сочи</option><option>Адлер</option><option>Красная Поляна</option><option>Геленджик</option><option>Анапа</option><option>Новороссийск</option><option>Темрюк</option><option>Туапсе</option><option>Апшеронск</option>
+        </select>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2 mt-3">
+      <button class="btn btn-outline" id="nearMe">📍 Показать рядом</button>
+      <button class="btn btn-outline" id="reset">↺ Сбросить</button>
+      <span class="geomsg hidden" id="geoStatus">Определяем геопозицию…</span>
+    </div>
+  </section>
+
+  <!-- Карта -->
+  <section class="grid lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 card p-3 shadow-soft">
+      <div id="map"></div>
+      <div class="flex gap-2 mt-3">
+        <label class="tag"><input id="toggleAttractions" type="checkbox" class="mr-1" checked> Объекты</label>
+        <label class="tag"><input id="toggleOperators" type="checkbox" class="mr-1" checked> Организаторы</label>
+        <label class="tag"><input id="toggleFavorites" type="checkbox" class="mr-1"> Избранное</label>
+      </div>
+    </div>
+
+    <!-- Список -->
+    <aside class="card p-3 max-h-[60vh] overflow-auto shadow-soft" id="list"></aside>
+  </section>
+
+  <!-- Добавление -->
+  <section id="add" class="card p-5 shadow-soft">
+    <h2 class="text-lg font-bold mb-2">Добавить объект / организатора</h2>
+    <p class="text-slate-600 mb-3">Форма генерирует файл JSON, который можно прислать администратору или приложить в GitHub PR. Так база будет расти без хаоса и дублей.</p>
+    <form id="addForm" class="grid md:grid-cols-3 gap-3">
+      <input required class="border rounded-lg px-3 py-2" name="name" placeholder="Название">
+      <select class="border rounded-lg px-3 py-2" name="category">
+        <option>Природа</option><option>Парки/аттракционы</option><option>История/музеи</option>
+        <option>Горнолыжный кластер</option><option>Винные туры</option><option>Организатор/туроператор</option>
+      </select>
+      <input class="border rounded-lg px-3 py-2" name="district" placeholder="Район/город">
+      <input class="border rounded-lg px-3 py-2" name="lat" placeholder="Широта (например 44.62)">
+      <input class="border rounded-lg px-3 py-2" name="lon" placeholder="Долгота (например 38.04)">
+      <input class="border rounded-lg px-3 py-2" name="phone" placeholder="Телефон">
+      <input class="border rounded-lg px-3 py-2" name="email" placeholder="Email">
+      <input class="border rounded-lg px-3 py-2" name="site" placeholder="Сайт (https://)">
+      <input class="border rounded-lg px-3 py-2" name="whatsapp" placeholder="WhatsApp (с цифрами)">
+      <input class="border rounded-lg px-3 py-2" name="tg" placeholder="Telegram (@user или ссылка)">
+      <input class="border rounded-lg px-3 py-2 md:col-span-3" name="address" placeholder="Адрес (если есть)">
+      <textarea class="border rounded-lg px-3 py-2 md:col-span-3" name="desc" placeholder="Короткое описание" rows="3"></textarea>
+      <div class="md:col-span-3 flex gap-2">
+        <button class="btn btn-primary" type="submit">💾 Скачать JSON</button>
+        <button class="btn btn-outline" type="button" id="clearForm">Очистить</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="text-slate-500 text-sm">
+    <p>Данные — из открытых официальных источников, пополняются. При наличии замечаний/добавлений — используй форму выше. Сделано с заботой о путешественниках ❤️</p>
+  </section>
+</main>
+
+<footer class="py-8 text-center text-slate-500">
+  © 2025. Краснодарский край — путеводитель.
+</footer>
+
+<!-- === ДАННЫЕ (стартовый набор) === -->
+<script id="DATA" type="application/json">
+{
+  "places":[
+    {
+      "id":"park_krasnodar",
+      "name":"Парк «Краснодар» (Парк Галицкого)",
+      "category":"Парки/аттракционы",
+      "district":"Краснодар",
+      "lat":45.0337, "lon":39.0136,
+      "address":"Краснодар, ул. Разведчика Леонова, 1",
+      "desc":"Знаковый городской парк и амфитеатр рядом со стадионом ФК «Краснодар».",
+      "contacts":{"phone":"+7 861 210-65-75","email":"info@parkkrasnodar.com","site":"https://www.parkkrasnodar.com","vk":"https://vk.com/officialparkkrasnodar"}
+    },
+    {
+      "id":"sochi_np",
+      "name":"Сочинский национальный парк — дирекция",
+      "category":"Природа",
+      "district":"Сочи",
+      "lat":43.591, "lon":39.723,
+      "address":"Сочи, Курортный пр., 74",
+      "desc":"Крупнейшие природные объекты Большого Сочи: Агурские и Ореховские водопады, Ахун и др.",
+      "contacts":{"phone":"+7 862 265-8909","email":"forest_sochi@npsochi.ru","site":"https://npsochi.ru"}
+    },
+    {
+      "id":"agurskiye",
+      "name":"Агурские водопады",
+      "category":"Природа",
+      "district":"Сочи",
+      "lat":43.558, "lon":39.831,
+      "address":"Хостинский р-н, урочище Агура",
+      "desc":"Каскад водопадов и каньон. Популярный пеший маршрут в пределах Сочинского нацпарка.",
+      "contacts":{"site":"https://npsochi.ru"}
+    },
+    {
+      "id":"akhun",
+      "name":"Гора и башня Ахун",
+      "category":"Природа",
+      "district":"Сочи",
+      "lat":43.550, "lon":39.820,
+      "address":"Хостинский р-н",
+      "desc":"Панорамная каменная башня на вершине горы Ахун. Лучшие виды на побережье.",
+      "contacts":{"site":"https://npsochi.ru"}
+    },
+    {
+      "id":"riviera_sochi",
+      "name":"Парк «Ривьера», Сочи",
+      "category":"Парки/аттракционы",
+      "district":"Сочи",
+      "lat":43.592, "lon":39.720,
+      "address":"г. Сочи, ул. Егорова, 1",
+      "desc":"Исторический парк с аттракционами в центре Сочи.",
+      "contacts":{"phone":"+7 862 264-33-77","email":"info@rivierasochi.ru","site":"https://rivierasochi.ru"}
+    },
+    {
+      "id":"sochi_park",
+      "name":"Сочи Парк (тематический парк)",
+      "category":"Парки/аттракционы",
+      "district":"Адлер",
+      "lat":43.404, "lon":39.954,
+      "address":"Имеретинская низменность",
+      "desc":"Крупнейший тематический парк страны рядом с Олимпийским парком.",
+      "contacts":{"phone":"8 800 100-33-39","site":"https://www.sochipark.ru"}
+    },
+    {
+      "id":"olympic_pk",
+      "name":"Олимпийский парк, Сириус",
+      "category":"Парки/аттракционы",
+      "district":"Адлер",
+      "lat":43.402, "lon":39.957,
+      "address":"пос. Сириус",
+      "desc":"Арены, набережные, поющие фонтаны и Сочи Автодром.",
+      "contacts":{"site":"https://park.sochisirius.ru","extra":"https://sochiautodrom.ru"}
+    },
+    {
+      "id":"skypark",
+      "name":"Skypark AJ Hackett Sochi",
+      "category":"Парки/аттракционы",
+      "district":"Адлер",
+      "lat":43.533, "lon":39.997,
+      "address":"с. Казачий Брод, ул. Краснофлотская, 54а",
+      "desc":"Подвесной мост, банджи 207 м, зиплайны в Ахштырском ущелье.",
+      "contacts":{"site":"https://skypark.ru","phone":"+7 918 930-90-90"}
+    },
+    {
+      "id":"rosa",
+      "name":"Курорт «Роза Хутор»",
+      "category":"Горнолыжный кластер",
+      "district":"Красная Поляна",
+      "lat":43.671, "lon":40.297,
+      "address":"с. Эсто-Садок",
+      "desc":"Канатные дороги, трекинг и круглогодичные активности.",
+      "contacts":{"phone":"8 800 5000-555","email":"order@rosakhutor.com","site":"https://rosakhutor.ru"}
+    },
+    {
+      "id":"guamka",
+      "name":"Гуамское ущелье (Мезмай — узкоколейка)",
+      "category":"Природа",
+      "district":"Апшеронск",
+      "lat":44.197, "lon":39.968,
+      "address":"Ст-ца Гуамка",
+      "desc":"Живописный каньон, туристическая узкоколейка, канатная дорога.",
+      "contacts":{"phone":"+7 86152 2-74-85","email":"guamka2017@yandex.ru","site":"https://guamka-kuban.ru"}
+    },
+    {
+      "id":"safari_gel",
+      "name":"Сафари-парк Геленджик",
+      "category":"Парки/аттракционы",
+      "district":"Геленджик",
+      "lat":44.553, "lon":38.130,
+      "address":"М-4 Дон, 1511 км + 750 м",
+      "desc":"Реабилитационный центр диких животных, канатная дорога.",
+      "contacts":{"phone":"+7 989 160-06-42","site":"https://www.safari-park.ru","email":"safari-park@list.ru"}
+    },
+    {
+      "id":"olimp_gel",
+      "name":"Горный парк «Олимп» (канатная дорога)",
+      "category":"Парки/аттракционы",
+      "district":"Геленджик",
+      "lat":44.575, "lon":38.055,
+      "address":"Куприянова щель, 1",
+      "desc":"Канатная дорога, колесо, океанариум — семейный парк на высоте.",
+      "contacts":{"phone":"+7 988 333-07-70","site":"https://park-olimp.ru"}
+    },
+    {
+      "id":"sail_rock",
+      "name":"Скала Парус, Прасковеевка",
+      "category":"Природа",
+      "district":"Геленджик",
+      "lat":44.438624, "lon":38.184573,
+      "address":"Пос. Прасковеевка",
+      "desc":"Визит-точка Черноморского побережья — тонкая скала у кромки моря.",
+      "contacts":{}
+    },
+    {
+      "id":"utrish",
+      "name":"Госзаповедник «Утриш» — визит-центр",
+      "category":"Природа",
+      "district":"Анапа",
+      "lat":44.8947, "lon":37.3176,
+      "address":"Анапа, ул. Северная, 41В",
+      "desc":"Реликтовые можжевеловые леса, бухты Утриша, экотропы.",
+      "contacts":{"phone":"+7 86133 7-07-79","email":"mail@zapovednik-utrish.ru","site":"https://zapovednik-utrish.ru"}
+    },
+    {
+      "id":"abrau",
+      "name":"Абрау-Дюрсо — винные туры",
+      "category":"Винные туры",
+      "district":"Новороссийск",
+      "lat":44.706, "lon":37.583,
+      "address":"п. Абрау-Дюрсо",
+      "desc":"Экскурсии по подвалам, дегустации, прогулки по озеру Абрау.",
+      "contacts":{"site":"https://abrau.ru","extra":"https://abrau.ru/tourism"}
+    },
+    {
+      "id":"fanagoria",
+      "name":"Фанагория — винодельня и туры",
+      "category":"Винные туры",
+      "district":"Темрюк",
+      "lat":45.088, "lon":37.381,
+      "address":"п. Сенной, ул. Мира, 49",
+      "desc":"Дегустации, винные погреба, экскурсии по производству.",
+      "contacts":{"site":"https://www.fanagoria.ru","phone":"+7 861 483-87-47"}
+    },
+    {
+      "id":"malaya_zemlya",
+      "name":"Мемориал «Малая Земля»",
+      "category":"История/музеи",
+      "district":"Новороссийск",
+      "lat":44.729, "lon":37.784,
+      "address":"Новороссийск, Суджукская коса, 1А",
+      "desc":"Знаковый мемориал с галереей боевой славы.",
+      "contacts":{"site":"https://novomuseum.ru"}
+    },
+    {
+      "id":"mikhail_kutuzov",
+      "name":"Музей-крейсер «Михаил Кутузов»",
+      "category":"История/музеи",
+      "district":"Новороссийск",
+      "lat":44.724, "lon":37.769,
+      "address":"Наб. Адм. Серебрякова, 2А",
+      "desc":"Филиал Центрального военно-морского музея на борту крейсера.",
+      "contacts":{"phone":"8 800 300-80-51","email":"navalmuseum_kbs@mil.ru","site":"https://navalmuseum.ru/filials/cruiser_mikhail_kutuzov"}
+    },
+    {
+      "id":"gefest",
+      "name":"Грязевой вулкан «Гефест»",
+      "category":"Природа",
+      "district":"Темрюк",
+      "lat":45.283, "lon":37.401,
+      "address":"Темрюк, пер. Песчаный, 2/1",
+      "desc":"Купание в лечебной грязи на вершине вулкана.",
+      "contacts":{"phone":"+7 918 054-02-01","site":"https://vulkan-gefest.ru"}
+    },
+    {
+      "id":"krasnodar_tic",
+      "name":"ТИЦ города Краснодара (турист-инфо)",
+      "category":"Организатор/туроператор",
+      "district":"Краснодар",
+      "lat":45.035, "lon":38.975,
+      "address":"Краснодар",
+      "desc":"Туристско-информационный центр города.",
+      "contacts":{"phone":"+7 861 218-97-77","email":"tic@krd.ru","site":"https://tourism.krd.ru"}
+    }
+  ],
+  "operators":[
+    {
+      "id":"op_sochi_exc365",
+      "name":"Экскурсии Сочи «Круглый год»",
+      "category":"Организатор/туроператор",
+      "district":"Сочи",
+      "lat":43.590,"lon":39.728,
+      "address":"Сочи",
+      "desc":"Авто, морские и активные экскурсии по Большому Сочи.",
+      "contacts":{"phone":"8 (800) 201-14-47","site":"https://excursions-sochi.ru"}
+    },
+    {
+      "id":"op_yuzhnye_reg",
+      "name":"Южные регионы — агрегатор туров выходного дня",
+      "category":"Организатор/туроператор",
+      "district":"Краснодар",
+      "lat":45.04,"lon":38.98,
+      "address":"Краснодар",
+      "desc":"Проверенные турклубы и туроператоры, единая витрина туров.",
+      "contacts":{"site":"https://xn----ftbebcq4afiq2ji1a.xn--p1ai/krasnodar"}
+    },
+    {
+      "id":"op_eos",
+      "name":"ЭОС — автобусные туры из Краснодара",
+      "category":"Организатор/туроператор",
+      "district":"Краснодар",
+      "lat":45.04,"lon":38.98,
+      "address":"Краснодар",
+      "desc":"Однодневные экскурсии по краю, многодневные туры.",
+      "contacts":{"site":"https://eostour.ru"}
+    },
+    {
+      "id":"op_riviera_sochi",
+      "name":"МУП «Парки отдыха Ривьера-Сочи» (экскурсии/мероприятия)",
+      "category":"Организатор/туроператор",
+      "district":"Сочи",
+      "lat":43.592,"lon":39.720,
+      "address":"Сочи, ул. Егорова, 1",
+      "desc":"Организация мероприятий и экскурсий на базе парка.",
+      "contacts":{"phone":"+7 862 264-33-77","email":"info@rivierasochi.ru","site":"https://rivierasochi.ru"}
+    },
+    {
+      "id":"op_abrau_tours",
+      "name":"Абрау-Дюрсо — туристический центр",
+      "category":"Организатор/туроператор",
+      "district":"Новороссийск",
+      "lat":44.706,"lon":37.583,
+      "address":"п. Абрау-Дюрсо",
+      "desc":"Экскурсии, дегустации, прогулки на сапах и по озеру.",
+      "contacts":{"site":"https://abrau.ru/tourism"}
+    },
+    {
+      "id":"op_fanagoria_tours",
+      "name":"Фанагория — экскурсии и дегустации",
+      "category":"Организатор/туроператор",
+      "district":"Темрюк",
+      "lat":45.088,"lon":37.381,
+      "address":"п. Сенной, ул. Мира, 49",
+      "desc":"Экскурсии по винодельне, дегустации, энотуры.",
+      "contacts":{"site":"https://www.fanagoria.ru/tourism/tours/","phone":"+7 861 483-87-47"}
+    },
+    {
+      "id":"op_skypark",
+      "name":"Skypark Sochi — мероприятия/экскурсии",
+      "category":"Организатор/туроператор",
+      "district":"Адлер",
+      "lat":43.533,"lon":39.997,
+      "address":"с. Казачий Брод",
+      "desc":"Экстрим-активности, корпоративы, свадьбы, туры.",
+      "contacts":{"site":"https://skypark.ru","phone":"+7 918 930-90-90"}
+    },
+    {
+      "id":"op_guamka",
+      "name":"Туркомплекс «Гуамка»",
+      "category":"Организатор/туроператор",
+      "district":"Апшеронск",
+      "lat":44.197,"lon":39.968,
+      "address":"Ст-ца Гуамка",
+      "desc":"Ж/д прогулки в ущелье, экскурсии, питание.",
+      "contacts":{"phone":"+7 86152 2-74-85","site":"https://guamka-kuban.ru"}
+    }
+  ]
+}
+</script>
+
+<!-- === ПРИЛОЖЕНИЕ === -->
+<script>
+  // --- PWA
+  if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js')); }
+  let deferredPrompt; const ib=document.getElementById('installBtn');
+  window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferredPrompt=e; ib.classList.remove('hidden'); });
+  ib?.addEventListener('click', async ()=>{ if(!deferredPrompt) return; deferredPrompt.prompt(); deferredPrompt=null; ib.classList.add('hidden'); });
+
+  // --- DATA
+  const DB = JSON.parse(document.getElementById('DATA').textContent);
+  const ALL = [...DB.places.map(p=>({...p,type:'place'})), ...DB.operators.map(p=>({...p,type:'operator'}))];
+
+  // --- MAP
+  const map = L.map('map',{ zoomControl:true }).setView([44.9, 38.9], 7);
+  const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom: 18, attribution:'© OpenStreetMap'
+  }).addTo(map);
+  const clusterPlaces = L.markerClusterGroup({ disableClusteringAtZoom: 14 });
+  const clusterOps    = L.markerClusterGroup({ disableClusteringAtZoom: 14 });
+
+  // Icons
+  const iconBlue  = L.icon({iconUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', iconSize:[25,41], iconAnchor:[12,41], popupAnchor:[1,-28]});
+  const iconGold  = L.icon({iconUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png', iconSize:[25,41], iconAnchor:[12,41], popupAnchor:[1,-28]});
+
+  const markers = {};
+  function phoneLink(p){ return p ? `<a class="underline" href="tel:${p.replace(/[^+\d]/g,'')}">${p}</a>`:'' }
+  function siteLink(s){ return s ? `<a class="underline" target="_blank" rel="noopener" href="${s}">${new URL(s).hostname}</a>`:'' }
+  function waLink(n){ return n ? `<a class="underline" target="_blank" href="https://wa.me/${n.replace(/[^0-9]/g,'')}">WhatsApp</a>`:'' }
+  function tgLink(t){ return t ? `<a class="underline" target="_blank" href="${t.startsWith('http')?t:`https://t.me/${t.replace('@','')}`}">Telegram</a>`:'' }
+  function navLink(lat,lon){ return (lat && lon) ? `<a class="underline" target="_blank" href="https://yandex.ru/navi/?whatshere%5Bpoint%5D=${lon}%2C${lat}&whatshere%5Bzoom%5D=16&lang=ru&from=navi">Навигатор</a>`:'' }
+
+  function makePopup(it){
+    const c = it.contacts||{};
+    return `
+      <div class="text-sm">
+        <div class="font-semibold">${it.name}</div>
+        <div class="text-slate-600">${it.category} • ${it.district||''}</div>
+        <div class="mt-1">${it.desc||''}</div>
+        <div class="mt-2 flex flex-wrap gap-2">
+          ${phoneLink(c.phone)} ${c.email?`<span>•</span> <a class="underline" href="mailto:${c.email}">${c.email}</a>`:''}
+          ${c.site?`<span>•</span> ${siteLink(c.site)}`:''}
+          ${c.whatsapp?`<span>•</span> ${waLink(c.whatsapp)}`:''}
+          ${c.tg?`<span>•</span> ${tgLink(c.tg)}`:''}
+          ${navLink(it.lat,it.lon)}
+        </div>
+      </div>`;
+  }
+
+  function addMarker(it){
+    if(!it.lat || !it.lon) return;
+    const marker = L.marker([it.lat,it.lon], { icon: it.type==='operator'?iconGold:iconBlue });
+    marker.bindPopup(makePopup(it));
+    markers[it.id]=marker;
+    if(it.type==='operator') clusterOps.addLayer(marker); else clusterPlaces.addLayer(marker);
+  }
+  ALL.forEach(addMarker);
+  map.addLayer(clusterPlaces); map.addLayer(clusterOps);
+
+  // --- SEARCH + FILTERS
+  const $q = document.getElementById('q'), $cat=document.getElementById('cat'), $dist=document.getElementById('dist');
+  const $list = document.getElementById('list');
+  const fuse = new Fuse(ALL,{ keys:['name','desc','category','district','address','contacts.phone','contacts.site'], threshold:.35 });
+
+  const favKey='kk_favs_v1'; let FAVS=new Set(JSON.parse(localStorage.getItem(favKey)||'[]'));
+  const $toggleA=document.getElementById('toggleAttractions'), $toggleO=document.getElementById('toggleOperators'), $toggleF=document.getElementById('toggleFavorites');
+
+  function fits(it){
+    if($toggleF.checked && !FAVS.has(it.id)) return false;
+    if($cat.value && it.category!==$cat.value) return false;
+    if($dist.value && (it.district||'')!==$dist.value) return false;
+    if(!$toggleA.checked && it.type==='place') return false;
+    if(!$toggleO.checked && it.type==='operator') return false;
+    return true;
+  }
+
+  let userPos=null;
+  function distanceKm(a,b){ const R=6371; const dLat=(b.lat-a.lat)*Math.PI/180, dLon=(b.lon-a.lon)*Math.PI/180;
+    const lat1=a.lat*Math.PI/180, lat2=b.lat*Math.PI/180;
+    const x = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(x)); }
+
+  function render(items){
+    clusterPlaces.clearLayers(); clusterOps.clearLayers();
+    $list.innerHTML='';
+    items.forEach(it=>{
+      if(!fits(it)) return;
+      // show marker
+      addMarker(it);
+      const c=it.contacts||{}, isFav=FAVS.has(it.id);
+      const dist = (userPos && it.lat && it.lon) ? `• ${(distanceKm({lat:userPos[0],lon:userPos[1]},{lat:it.lat,lon:it.lon)).toFixed(1)} км` : '';
+      const card = document.createElement('div');
+      card.className='card p-3 mb-3';
+      card.innerHTML=`
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="badge">${it.category}</span>
+              ${it.type==='operator'?'<span class="badge">Организатор</span>':''}
+            </div>
+            <h3 class="text-base font-bold mt-1">${it.name}</h3>
+            <div class="text-slate-600">${it.district||''} ${dist}</div>
+            <p class="mt-2">${it.desc||''}</p>
+            ${it.address?`<div class="text-slate-500 mt-1">📍 ${it.address}</div>`:''}
+            <div class="mt-2 flex flex-wrap gap-2">
+              ${phoneLink(c.phone)} ${c.email?`<span>•</span> <a class="underline" href="mailto:${c.email}">${c.email}</a>`:''}
+              ${c.site?`<span>•</span> ${siteLink(c.site)}`:''}
+              ${c.whatsapp?`<span>•</span> ${waLink(c.whatsapp)}`:''}
+              ${c.tg?`<span>•</span> ${tgLink(c.tg)}`:''}
+              ${navLink(it.lat,it.lon)}
+            </div>
+          </div>
+          <div class="flex flex-col items-end gap-2">
+            <button class="fav text-xl" title="${isFav?'В избранном':'В избранное'}"> ${isFav?'⭐️':'☆'} </button>
+            ${it.lat&&it.lon?`<button class="btn btn-outline text-xs" data-goto="${it.id}">На карте</button>`:''}
+          </div>
+        </div>`;
+      $list.appendChild(card);
+      // handlers
+      card.querySelector('.fav').onclick=()=>{
+        if(FAVS.has(it.id)){ FAVS.delete(it.id); } else { FAVS.add(it.id); }
+        localStorage.setItem(favKey, JSON.stringify([...FAVS]));
+        render(current);
+      };
+      const goto=card.querySelector('[data-goto]');
+      if(goto) goto.onclick=()=>{ const m=markers[it.id]; if(m){ map.setView(m.getLatLng(), 15); m.openPopup(); } };
+    });
+  }
+
+  let current=ALL;
+  function apply(){
+    const q=$q.value.trim();
+    let result = ALL;
+    if(q){ result=fuse.search(q).map(r=>r.item); }
+    current = result;
+    render(result);
+  }
+
+  $q.addEventListener('input', apply);
+  $cat.onchange=apply; $dist.onchange=apply;
+  $toggleA.onchange=apply; $toggleO.onchange=apply; $toggleF.onchange=apply;
+
+  // Геолокация
+  const $near=document.getElementById('nearMe'), $geo=document.getElementById('geoStatus');
+  $near.onclick=()=>{
+    $geo.classList.remove('hidden'); $geo.textContent='Определяем геопозицию…';
+    navigator.geolocation.getCurrentPosition(pos=>{
+      userPos=[pos.coords.latitude, pos.coords.longitude];
+      $geo.textContent='Геопозиция определена ✔';
+      // Сортируем по расстоянию
+      current = [...ALL].filter(fits).sort((a,b)=>{
+        const da = (a.lat && a.lon) ? distanceKm({lat:userPos[0],lon:userPos[1]},{lat:a.lat,lon:a.lon}) : 9e9;
+        const db = (b.lat && b.lon) ? distanceKm({lat:userPos[0],lon:userPos[1]},{lat:b.lat,lon:b.lon}) : 9e9;
+        return da-db;
+      });
+      map.setView(userPos, 11);
+      render(current);
+    }, err=>{ $geo.textContent='Не удалось получить геопозицию'; setTimeout(()=>{$geo.classList.add('hidden')},2000); });
+  };
+
+  // Сброс
+  document.getElementById('reset').onclick=()=>{
+    $q.value=''; $cat.value=''; $dist.value=''; $toggleF.checked=false; $toggleA.checked=true; $toggleO.checked=true;
+    apply();
+  };
+
+  // Экспорт CSV
+  function toCsvRow(o, fields){ return fields.map(f=>JSON.stringify((o?.[f]??'').toString().replace(/\n/g,' '))).join(','); }
+  document.getElementById('exportCsv').onclick=(e)=>{
+    e.preventDefault();
+    const fields=['id','type','name','category','district','lat','lon','address','desc','phone','email','site','whatsapp','tg'];
+    const rows=[fields.join(',')];
+    ALL.forEach(it=>{
+      const c=it.contacts||{};
+      const flat={...it, phone:c.phone||'', email:c.email||'', site:c.site||'', whatsapp:c.whatsapp||'', tg:c.tg||''};
+      rows.push(toCsvRow(flat, fields));
+    });
+    const blob=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8;'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='krasnodar_travel_catalog.csv'; a.click();
+  };
+
+  // Добавление JSON
+  document.getElementById('addForm').addEventListener('submit',(e)=>{
+    e.preventDefault();
+    const fd=new FormData(e.target); const obj=Object.fromEntries(fd.entries());
+    const entry={
+      id: 'custom_' + Math.random().toString(36).slice(2,9),
+      name: obj.name, category: obj.category, district: obj.district||'',
+      lat: obj.lat?Number(obj.lat):null, lon: obj.lon?Number(obj.lon):null,
+      address: obj.address||'', desc: obj.desc||'',
+      contacts: { phone:obj.phone||'', email:obj.email||'', site:obj.site||'', whatsapp:obj.whatsapp||'', tg:obj.tg||'' }
+    };
+    const blob=new Blob([JSON.stringify(entry,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`new_place_${entry.id}.json`; a.click();
+  });
+  document.getElementById('clearForm').onclick=()=>{ document.getElementById('addForm').reset(); };
+
+  // Инициализация
+  apply();
+</script>
+</body>
+</html>
